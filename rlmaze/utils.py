@@ -25,7 +25,7 @@ class Utils:
 
     def sample_maze(self):
         """
-        sample maze (11 x 8)
+        sample maze (13 x 13)
         
         return:
             maze (array)
@@ -83,8 +83,8 @@ class Utils:
             print('Using sample maze')
             maze_grid, maze_start, maze_finish = self.sample_maze()
 
-        plt.imshow(maze_grid, cmap='Greys')
+        maze_img = plt.imshow(maze_grid, cmap='Greys', animated=True)
         plt.annotate('S', maze_start[::-1], color='red', fontsize=14)
         plt.annotate('F', maze_finish[::-1], color='red', fontsize=14)
         plt.savefig(self.fig_dir + 'maze.png', bbox_inches='tight')
-        return
+        return maze_img
