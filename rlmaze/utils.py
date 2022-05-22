@@ -32,23 +32,25 @@ class Utils:
         """
 
         maze_grid = np.array(
-                [[0, 0, 1, 0, 1, 0, 0, 1],
-                [0, 1, 1, 0, 1, 1, 0, 1],
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [1, 1, 0, 1, 0, 1, 1, 0],
-                [0, 1, 0, 1, 0, 0, 1, 0],
-                [0, 1, 0, 0, 1, 0, 0, 0],
-                [0, 1, 1, 0, 1, 1, 0, 1],
-                [0, 0, 1, 0, 0, 1, 0, 1],
-                [1, 0, 1, 0, 1, 1, 0, 0],
-                [1, 0, 0, 0, 1, 0, 0, 1],
-                [1, 0, 1, 0, 0, 0, 1, 1]], dtype = int )
+                [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+                [1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1],
+                [1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1],
+                [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1],
+                [1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1],
+                [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1],
+                [1, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1],
+                [1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 1],
+                [1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1],
+                [1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]], dtype = int )
 
-        maze_start = np.array( [maze_grid.shape[0]-1, 0] )
-        maze_finish = np.array( [0, maze_grid.shape[1]-1] )
+        maze_start = np.array( [maze_grid.shape[0]-2, 1] )
+        maze_finish = np.array( [1, maze_grid.shape[1]-2] )
 
-        maze_grid[maze_start[0]][maze_start[1]] = -1
-        maze_grid[maze_finish[0]][maze_finish[1]] = -1
+        maze_grid[maze_start[0]][maze_start[1]] = 0
+        maze_grid[maze_finish[0]][maze_finish[1]] = 0
 
         print('\nmaze_grid:')
         print(maze_grid)
@@ -81,8 +83,8 @@ class Utils:
             print('Using sample maze')
             maze_grid, maze_start, maze_finish = self.sample_maze()
 
-        plt.imshow(maze_grid)
-        plt.annotate('S', maze_start[::-1], color='white', fontsize=14)
-        plt.annotate('F', maze_finish[::-1], color='white', fontsize=14)
+        plt.imshow(maze_grid, cmap='Greys')
+        plt.annotate('S', maze_start[::-1], color='red', fontsize=14)
+        plt.annotate('F', maze_finish[::-1], color='red', fontsize=14)
         plt.savefig(self.fig_dir + 'maze.png', bbox_inches='tight')
         return
