@@ -9,6 +9,7 @@ TODO
 
 import numpy as np
 from .settings import Settings
+from .utils import Utils
 
 class RLMaze:
 
@@ -33,11 +34,22 @@ class RLMaze:
         self.maze_start = maze_start
         self.maze_finish = maze_finish
 
-        ### exploration vs exploitation
-        self.epsilon = 0.5
+        ### exploration vs exploitation 
+        ###     -> high epsilon, favor exploration
+        self.epsilon = 0.1
+
+        ### learning rate (0 < alpha < 1)
+        ###     -> high alpha, fast learning
+        self.alpha = 0.15
+
+        ### discount factor (0 < alpha < 1) -
+        ###     -> importance of long-term reward
+        ###     -> high gamma, high long-term effective reward        ->
+        self.gamma = 0.5
 
         self.maze_dim = maze_grid.shape
-        ### discrete action space
+
+        ### discrete action space (up, down, stay, left, right)
         self.actions = { 0: [0,0], 1: [0,1], 2: [0,-1], 3: [1,0], 4: [-1,0] }
         self.states = np.array([ [x, y] for x in range(0,self.maze_dim[0]) for y in range(0,self.maze_dim[1]) ])
         self.q_table = np.zeros( [len(self.states), len(self.actions)] )
@@ -59,24 +71,31 @@ class RLMaze:
         """
         self.initialize_learning_setup(maze_grid, maze_start, maze_finish)
 
-        epochs = 100
+        epochs = 200
         epoch_steps = []
+        epoch_explore_ratio = []
 
         for i in range(epochs):
+
+            print(f'\n\n\nEpoch ({i})')
 
             ### initialize
             state = self.maze_start
 
             self.maze_completed = False
             action_counter = 0
+            explore_counter = 0
+
+            # epsilon = i / epochs
 
             while self.maze_completed == False:
                 action_counter += 1
 
                 ### explore/exploit
-                if self.epsilon > np.random.uniform():
+                if np.random.uniform(low=0, high=1) < self.epsilon:
                     ### explore -> randomly choose action from discrete action space
                     action_number = np.random.randint(low=0, high=len(self.actions))
+                    explore_counter += 1
 
                 else:
                     ### exploit -> choose highest scoring action
@@ -91,29 +110,13 @@ class RLMaze:
 
                 print(f'\nnew_action ({action_counter}): {new_action} state: {old_state} -> {state}')
 
+            ### keep track of required steps
             epoch_steps.append(action_counter)
+            epoch_explore_ratio.append(explore_counter / action_counter )
 
-        print('Epoch learning:')
-        print(epoch_steps)
-
-        return
-
-
-    def agent_location(self,
-                    state):
-        """ agent location
-        
-        args:
-        - state (tuple): current state of agent
-        
-        return:
-
-        """
-        ### agent location
-        agent_loc = np.copy( self.maze_grid[:] )
-        agent_loc[state[0]][state[1]] = 5
-
-        print(f'\n Agent location (5) in maze:\n{agent_loc}')
+        print(f'\nEpoch learning:\n{epoch_steps}')
+        # print(f'\nExplore/exploit ratio:\n{epoch_explore_ratio}')
+        Utils().plot_epochs(epoch_steps)
 
         return
 
@@ -164,11 +167,32 @@ class RLMaze:
         else:
             print('Maze entry not valid')
 
-        self.q_table[ state[0]*self.maze_dim[0] + state[1] ][ action_number ] += reward
-        
+        self.q_table[ old_state[0]*self.maze_dim[0] + old_state[1] ][ action_number ] = \
+            (1- self.alpha) * self.q_table[ old_state[0]*self.maze_dim[0] + old_state[1] ][ action_number ] \
+            + self.alpha * (reward + self.gamma * np.max(self.q_table[ state[0]*self.maze_dim[0] + state[1] ]))
+
         ### if finished - print status
         if self.maze_completed == True:
             print('\nQ:', self.q_table)
             self.agent_location(state)
 
         return state
+
+
+    def agent_location(self,
+                    state):
+        """ agent location
+        
+        args:
+        - state (tuple): current state of agent
+        
+        return:
+
+        """
+        ### agent location
+        agent_loc = np.copy( self.maze_grid[:] )
+        agent_loc[state[0]][state[1]] = 5
+
+        print(f'\n Agent location (5) in maze:\n{agent_loc}')
+
+        return
