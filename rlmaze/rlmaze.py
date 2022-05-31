@@ -33,6 +33,9 @@ class RLMaze:
         self.maze_start = maze_start
         self.maze_finish = maze_finish
 
+        ### exploration vs exploitation
+        self.epsilon = 0.5
+
         self.maze_dim = maze_grid.shape
         ### discrete action space
         self.actions = { 0: [0,0], 1: [0,1], 2: [0,-1], 3: [1,0], 4: [-1,0] }
@@ -55,26 +58,43 @@ class RLMaze:
         - 
         """
         self.initialize_learning_setup(maze_grid, maze_start, maze_finish)
-        ### intialize state
-        state = self.maze_start
-        print(f'initial state: {state}')
 
-        self.maze_completed = False
-        action_counter = 0
+        epochs = 100
+        epoch_steps = []
 
-        while self.maze_completed == False:
-            action_counter += 1
+        for i in range(epochs):
 
-            ### randomly choose action from discrete action space
-            action_number = np.random.randint(low=0, high=len(self.actions))
-            new_action = self.actions[ action_number ]
-            
-            ### get new state
-            old_state = state
-            new_state = state + new_action
-            state = self.evaluate_action(state, new_state, action_number)
+            ### initialize
+            state = self.maze_start
 
-            print(f'\nnew_action ({action_counter}): {new_action} state: {old_state} -> {state}')
+            self.maze_completed = False
+            action_counter = 0
+
+            while self.maze_completed == False:
+                action_counter += 1
+
+                ### explore/exploit
+                if self.epsilon > np.random.uniform():
+                    ### explore -> randomly choose action from discrete action space
+                    action_number = np.random.randint(low=0, high=len(self.actions))
+
+                else:
+                    ### exploit -> choose highest scoring action
+                    action_number = np.argmax(self.q_table[ state[0]*self.maze_dim[0] + state[1] ])
+
+                new_action = self.actions[ action_number ]
+
+                ### get new state
+                old_state = state
+                new_state = state + new_action
+                state = self.evaluate_action(state, new_state, action_number)
+
+                print(f'\nnew_action ({action_counter}): {new_action} state: {old_state} -> {state}')
+
+            epoch_steps.append(action_counter)
+
+        print('Epoch learning:')
+        print(epoch_steps)
 
         return
 
@@ -93,7 +113,7 @@ class RLMaze:
         agent_loc = np.copy( self.maze_grid[:] )
         agent_loc[state[0]][state[1]] = 5
 
-        print(agent_loc)
+        print(f'\n Agent location (5) in maze:\n{agent_loc}')
 
         return
 
@@ -112,6 +132,8 @@ class RLMaze:
         return:
         - state (tuple): return (new) state of agent
         """
+        old_state = state
+
         ### check for maze finish
         if new_state[0] == self.maze_finish[0] and new_state[1] == self.maze_finish[1]:
             state = new_state
@@ -134,7 +156,7 @@ class RLMaze:
             state = new_state
 
         ### check for wall
-        if self.maze_grid[new_state[0]][new_state[1]] == 1:
+        elif self.maze_grid[new_state[0]][new_state[1]] == 1:
             state = state
             reward = -1
             print('Maze wall - use old_state')
@@ -146,7 +168,7 @@ class RLMaze:
         
         ### if finished - print status
         if self.maze_completed == True:
-            print('Q:', self.q_table)
+            print('\nQ:', self.q_table)
             self.agent_location(state)
 
         return state
