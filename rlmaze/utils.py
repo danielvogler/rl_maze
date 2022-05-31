@@ -119,3 +119,23 @@ class Utils:
         plt.annotate('F', maze_finish[::-1], color='red', fontsize=14)
         plt.savefig(self.fig_dir + maze_name + '.png', bbox_inches='tight')
         return maze_img
+
+    
+    def plot_epochs(self,
+                    epoch_steps):
+        """ plot required steps to escape maze with training 
+        
+        args:
+        - epoch_steps (list): steps required in each epoch
+        
+        return:
+        - 
+        """
+        plt.figure()
+        plt.plot(epoch_steps)
+        plt.title('Steps required to escape maze')
+        plt.xlabel('Epoch [-]')
+        plt.ylabel('Required steps [-]')
+        plt.savefig(self.fig_dir + 'training.png', bbox_inches='tight')
+
+        return
