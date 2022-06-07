@@ -53,10 +53,10 @@ class RLMaze:
         - 
         """
 
-        ### construct Q-DNN
-        qdnn = self.initialize_qdnn(self.states_dim, self.actions_dim)
+        ### construct NN
+        model = self.initialize_model(self.states_dim, self.actions_dim)
 
-        ### states identity to feed states into QDNN
+        ### states identity to feed states into NN
         states_identity = np.identity(len(self.states))
 
         epoch_steps = []
@@ -79,7 +79,7 @@ class RLMaze:
 
                 ### q-values for current state
                 old_state = state
-                q_values_old = qdnn.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
+                q_values_old = model.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
 
                 ### explore/exploit
                 if np.random.uniform(low=0, high=1) < epsilon:
@@ -96,7 +96,7 @@ class RLMaze:
                 state, reward = self.compute_reward( old_state, state)
 
                 ### q values for new state
-                q_values_state = qdnn.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
+                q_values_state = model.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
 
                 ### constrain reward if maze is completed
                 if self.done == True:
@@ -108,7 +108,7 @@ class RLMaze:
                 q_values_old[0, action_arg] = target
 
                 ### fit model with updated targets
-                qdnn.fit(   tf.convert_to_tensor( states_identity[old_state], np.int64), q_values_old, epochs=1, verbose=0)
+                model.fit(   tf.convert_to_tensor( states_identity[old_state], np.int64), q_values_old, epochs=1, verbose=0)
 
             logging.info(f'Epoch ({i}/{self.cfg.epochs}): epsilon ({epsilon}) - actions ({action_counter})')
 
@@ -122,15 +122,15 @@ class RLMaze:
         return
 
 
-    def initialize_qdnn(self, state_dim: int, action_dim: int) -> keras.Model:
-        """ Initialize Q-DNN 
+    def initialize_model(self, state_dim: int, action_dim: int) -> keras.Model:
+        """ Initialize NN model
         
         args: 
         - state_dim (int): number of states
         - action_dim (int): number of actions
         
         return:
-        - model (keras.Model): QDNN model to train
+        - model (keras.Model): NN model to train
         """
 
         model = Sequential()
