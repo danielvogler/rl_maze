@@ -34,6 +34,7 @@ class Settings:
         ### exploration vs exploitation 
         ###     -> high epsilon, favor exploration
         cfg.epsilon = float( cfg['parameters']['epsilon'] )
+        cfg.epsilon_decay = float( cfg['parameters']['epsilon_decay'] )
         ### discount factor (0 < alpha < 1) -
         ###     -> importance of long-term reward
         ###     -> high gamma, high long-term effective reward        ->
