@@ -46,6 +46,7 @@ class Settings:
 
         ### training
         cfg.epochs = int( cfg['training']['epochs'] )
+        cfg.layer_nodes = int( cfg['training']['layer_nodes'] )
 
         ### maze
         cfg.maze_name = str( cfg['maze']['name'] )

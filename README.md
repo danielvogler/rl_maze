@@ -1,5 +1,5 @@
 # RL_maze
-Escape a maze using reinforcement learning
+Escape a maze using (deep) reinforcement learning
 
 Generates a grid maze, with start, finish and walls, which an agent has to navigate. The agent can move through the maze by performing actions and learning from them.
 
@@ -31,7 +31,7 @@ RLMaze can easily be used as follows:
 
 ```
 from rlmaze.rlmaze import RLMaze
-RLMaze().escape_maze(<config_file>)
+RLMaze(<config_file>).escape_maze()
 ```
 
 to train on a maze. The maze can be visualized with:
@@ -53,12 +53,15 @@ or
 ![Example image](/images/maze_diagonal.png "Diagonal maze layout")  
 Fig 1: Diagonal maze layout with start (S) and finish (F).
 
-![Example image](/images/maze_diagonal_training.png "Diagonal maze training")  
-Fig 2: Diagonal maze training. Convergence to optimal number of steps (8). 
+![Example image](/images/maze_diagonal_training_deepRL.png "Diagonal maze training deep RL")  
+Fig 2: Diagonal maze training (deep RL). Convergence to optimal number of steps (8). 
 
-## 13x13 maze
+![Example image](/images/maze_diagonal_training.png "Diagonal maze training")  
+Fig 2: Diagonal maze training (Classic Q-learning). Convergence to optimal number of steps (8). 
+
+### 13x13 maze
 ![Example image](/images/maze_13x13.png "13x13 maze layout")  
 Fig 3: Diagonal maze layout with start (S) and finish (F).
 
 ![Example image](/images/maze_13x13_training.png "13x13 maze training")  
-Fig 4: 13x13 maze training. Convergence to optimal number of steps (20). 
+Fig 4: 13x13 maze training (Classic Q-learning). Convergence to optimal number of steps (20). 
