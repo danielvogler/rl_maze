@@ -8,20 +8,43 @@ RL learning setup and algo
 
 import numpy as np
 import logging
+import tensorflow as tf
+import tensorflow.keras as keras
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import InputLayer
+from tensorflow.keras.layers import Dense
 from .settings import Settings
 from .utils import Utils
 
 
+
 class RLMaze: 
 
-    def __init__(self):
+    def __init__(self,
+                cfg_file):
         self.PROJECT_ROOT = Settings().PROJECT_ROOT
         self.PACKAGE_ROOT = Settings().PACKAGE_ROOT
+
+        self.cfg = Settings().config( cfg_file )
+
+        ### environment
+        self.actions = { 0: [0,1], 1: [0,-1], 2: [1,0], 3: [-1,0] }
+        self.states = tf.convert_to_tensor( self.cfg.maze_grid.flatten(), np.int64)
+
+        ### maze properties
+        self.cfg.maze_dim = self.cfg.maze_grid.shape
+        self.maze_start = tf.convert_to_tensor( [[self.cfg.maze_start[0] * self.cfg.maze_dim[0] + self.cfg.maze_start[1]]], np.int64)
+        self.maze_finish = tf.convert_to_tensor( [[self.cfg.maze_finish[0] * self.cfg.maze_dim[0] + self.cfg.maze_finish[1]]], np.int64)
+        self.state = self.maze_start
+
+        ### dimensions
+        self.actions_dim = len(self.actions)
+        self.states_dim = len(self.states)
+
         return
 
    
-    def escape_maze(self,
-                cfg_file):
+    def escape_maze(self):
         """ initialize q-learning setup 
         
         args:
@@ -29,120 +52,125 @@ class RLMaze:
         return:
         - 
         """
-        self.cfg = Settings().config( cfg_file )
 
-        maze_grid = self.cfg.maze_grid
-        maze_start = self.cfg.maze_start
-        maze_finish = self.cfg.maze_finish
-        maze_dim = maze_grid.shape
+        ### construct Q-DNN
+        qdnn = self.initialize_qdnn(self.states_dim, self.actions_dim)
 
-        actions = { 0: [0,0], 1: [0,1], 2: [0,-1], 3: [1,0], 4: [-1,0] }
-        states = np.array([ [x, y] for x in range(0, maze_dim[0]) for y in range(0, maze_dim[1]) ])
-        q_table = np.zeros( [len(states), len(actions)] )
+        ### states identity to feed states into QDNN
+        states_identity = np.identity(len(self.states))
 
         epoch_steps = []
-        epoch_explore_ratio = []
+        epsilon = self.cfg.epsilon
 
+        ### train maze escaping
         for i in range( self.cfg.epochs ):
 
             logging.debug(f'Epoch ({i}/{self.cfg.epochs})')
 
-            ### initialize
-            state = maze_start
-
-            self.maze_completed = False
+            ### initialize system
+            state = self.maze_start
+            self.done = False
             action_counter = 0
-            explore_counter = 0
 
-            # epsilon = i / epochs
+            epsilon *= self.cfg.epsilon_decay
 
-            while self.maze_completed == False:
+            while self.done == False:
                 action_counter += 1
 
-                new_action, action_number, explore_counter = self.perform_action(state,
-                                                                                actions,
-                                                                                q_table,
-                                                                                maze_dim,
-                                                                                explore_counter)
-
-                ### get new state
+                ### q-values for current state
                 old_state = state
-                new_state = old_state + new_action
+                q_values_old = qdnn.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
 
-                new_state, reward = self.compute_reward(
-                                            old_state,
-                                            new_state,
-                                            action_number,
-                                            maze_grid,
-                                            maze_finish)
+                ### explore/exploit
+                if np.random.uniform(low=0, high=1) < epsilon:
+                    ### explore -> randomly choose action from discrete action space
+                    action_arg = np.random.randint(low=0, high=len(self.actions))
 
-                logging.debug(f'\nnew_action ({action_counter}): {new_action} state: {old_state} -> {new_state}')
+                else:
+                    ### exploit -> choose highest scoring action
+                    action_arg = np.argmax(q_values_old)
 
-                q_table[ old_state[0]*maze_dim[0] + old_state[1] ][ action_number ] = \
-                    (1- self.cfg.alpha) * q_table[ old_state[0]*maze_dim[0] + old_state[1] ][ action_number ] \
-                    + self.cfg.alpha * (reward + self.cfg.gamma * np.max(q_table[ new_state[0]*maze_dim[0] + new_state[1] ]))
+                ### determine action, get new state + reward
+                action = self.actions[ action_arg ]
+                state = old_state + action[0] * self.cfg.maze_dim[0] + action[1]
+                state, reward = self.compute_reward( old_state, state)
 
-                ### if finished - print status
-                if self.maze_completed == True:
-                    logging.debug('Q:', q_table)
+                ### q values for new state
+                q_values_state = qdnn.predict( tf.convert_to_tensor( states_identity[state], np.int64), verbose=0 )
 
-                state = new_state
+                ### constrain reward if maze is completed
+                if self.done == True:
+                    target = reward
 
-            logging.info(f'Epoch ({i}/{self.cfg.epochs}): actions ({action_counter})')
+                elif self.done == False:
+                    target = (reward + self.cfg.gamma * np.max( q_values_state ) )
 
-            ### keep track of required steps
+                q_values_old[0, action_arg] = target
+
+                ### fit model with updated targets
+                qdnn.fit(   tf.convert_to_tensor( states_identity[old_state], np.int64), q_values_old, epochs=1, verbose=0)
+
+            logging.info(f'Epoch ({i}/{self.cfg.epochs}): self.actions ({action_counter})')
+
+            ### keep track of required steps in epoch
             epoch_steps.append(action_counter)
-            epoch_explore_ratio.append(explore_counter / action_counter )
 
-        self.agent_location(new_state, maze_grid)
-        logging.info(f'Q: {q_table}')
+        # self.agent_location(state)
         logging.info(f'Epoch learning: \n {epoch_steps}')
-        logging.debug(f'Explore/exploit ratio:\n{epoch_explore_ratio}')
         Utils().plot_epochs(epoch_steps, self.cfg.maze_name)
 
         return
 
 
+    def initialize_qdnn(self, state_dim: int, action_dim: int) -> keras.Model:
+        """ Initialize Q-DNN 
+        
+        args: 
+        - state_dim (int): number of states
+        - action_dim (int): number of actions
+        
+        return:
+        - model (keras.Model): QDNN model to train
+        """
+
+        model = Sequential()
+        model.add(InputLayer(batch_input_shape=(1, state_dim)))
+        model.add(Dense(10, activation='relu'))
+        model.add(Dense(10, activation='relu'))
+        model.add(Dense(action_dim, activation='linear'))
+        model.compile(loss='mse', optimizer='adam', metrics=['mae'])
+
+        return model
+
+
     def compute_reward(self,
                         old_state,
-                        new_state,
-                        action_number,
-                        maze_grid,
-                        maze_finish):
+                        new_state):
         """ evaluate performed action
         
         args:
         - state (tuple): state before action was performed
         - new_state (tuple): state after action, has to be checked first
-        - action_number (int): number of action to perform
         
         return:
         - state (tuple): return (new) state of agent
         """
 
         ### check for maze finish
-        if new_state[0] == maze_finish[0] and new_state[1] == maze_finish[1]:
+        if new_state == self.maze_finish:
             new_state = new_state
             reward = self.cfg.reward_finish
             logging.debug('Maze finish')
-            self.maze_completed = True
+            self.done = True
 
         ### perform action
-        elif maze_grid[new_state[0]][new_state[1]] == 0:
-            ### punish inaction
-            if action_number == 0:
-                reward = self.cfg.reward_inactive
-                logging.debug('Inactive - new_state')
-
-            ### reward action
-            else:
-                reward = self.cfg.reward_active
-                logging.debug('Move forward - new_state')
-
+        elif tf.gather(self.states, new_state) == 0:
             new_state = new_state
+            reward = self.cfg.reward_active
+            logging.debug('Move forward - new_state')
 
         ### check for wall
-        elif maze_grid[new_state[0]][new_state[1]] == 1:
+        elif tf.gather(self.states, new_state) == 1:
             new_state = old_state
             reward = self.cfg.reward_wall
             logging.debug('Maze wall - use old_state')
@@ -153,43 +181,18 @@ class RLMaze:
         return new_state, reward
 
 
-    def perform_action(self,
-                    state,
-                    actions,
-                    q_table,
-                    maze_dim,
-                    explore_counter):
-        """ perform action """
-
-        ### explore/exploit
-        if np.random.uniform(low=0, high=1) < self.cfg.epsilon:
-            ### explore -> randomly choose action from discrete action space
-            action_number = np.random.randint(low=0, high=len(actions))
-            explore_counter += 1
-
-        else:
-            ### exploit -> choose highest scoring action
-            action_number = np.argmax(q_table[ state[0]*maze_dim[0] + state[1] ])
-
-        new_action = actions[ action_number ]
-
-        return new_action, action_number, explore_counter
-
-
     def agent_location(self,
-                    state,
-                    maze_grid):
+                    state):
         """ agent location
         
         args:
         - state (tuple): current state of agent
-        - maze_grid (np.array): maze grid
         
         return:
 
         """
         ### agent location
-        agent_loc = np.copy( maze_grid[:] )
+        agent_loc = np.copy( self.cfg.maze_grid[:] )
         agent_loc[state[0]][state[1]] = 5
 
         logging.info(f'\n Agent location (5) in maze:\n{agent_loc}')
