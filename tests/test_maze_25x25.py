@@ -10,7 +10,7 @@ from rlmaze.rlmaze import RLMaze
 from rlmaze.utils import Utils
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 Utils().visualize_maze('maze_25x25')
 RLMaze().escape_maze('maze_25x25')
