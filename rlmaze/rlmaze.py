@@ -110,7 +110,7 @@ class RLMaze:
                 ### fit model with updated targets
                 qdnn.fit(   tf.convert_to_tensor( states_identity[old_state], np.int64), q_values_old, epochs=1, verbose=0)
 
-            logging.info(f'Epoch ({i}/{self.cfg.epochs}): self.actions ({action_counter})')
+            logging.info(f'Epoch ({i}/{self.cfg.epochs}): epsilon ({epsilon}) - actions ({action_counter})')
 
             ### keep track of required steps in epoch
             epoch_steps.append(action_counter)
@@ -135,8 +135,8 @@ class RLMaze:
 
         model = Sequential()
         model.add(InputLayer(batch_input_shape=(1, state_dim)))
-        model.add(Dense(10, activation='relu'))
-        model.add(Dense(10, activation='relu'))
+        model.add(Dense( self.cfg.layer_nodes, activation='relu'))
+        model.add(Dense( self.cfg.layer_nodes, activation='relu'))
         model.add(Dense(action_dim, activation='linear'))
         model.compile(loss='mse', optimizer='adam', metrics=['mae'])
 
