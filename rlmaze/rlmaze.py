@@ -31,39 +31,32 @@ class RLMaze:
         """
         self.cfg = Settings().config( cfg_file )
 
-        maze_grid = self.cfg.maze_grid
-        maze_start = self.cfg.maze_start
-        maze_finish = self.cfg.maze_finish
-        maze_dim = maze_grid.shape
+        self.cfg.maze_dim = self.cfg.maze_grid.shape
 
         actions = { 0: [0,0], 1: [0,1], 2: [0,-1], 3: [1,0], 4: [-1,0] }
-        states = np.array([ [x, y] for x in range(0, maze_dim[0]) for y in range(0, maze_dim[1]) ])
+        states = np.array([ [x, y] for x in range(0, self.cfg.maze_dim[0]) for y in range(0, self.cfg.maze_dim[1]) ])
         q_table = np.zeros( [len(states), len(actions)] )
 
         epoch_steps = []
-        epoch_explore_ratio = []
 
         for i in range( self.cfg.epochs ):
 
             logging.debug(f'Epoch ({i}/{self.cfg.epochs})')
 
             ### initialize
-            state = maze_start
+            state = self.cfg.maze_start
 
             self.maze_completed = False
             action_counter = 0
-            explore_counter = 0
 
             # epsilon = i / epochs
 
-            while self.maze_completed == False:
+            while self.maze_completed == False and action_counter < 100000:
                 action_counter += 1
 
-                new_action, action_number, explore_counter = self.perform_action(state,
-                                                                                actions,
-                                                                                q_table,
-                                                                                maze_dim,
-                                                                                explore_counter)
+                action_arg = self.perform_action(state, actions, q_table)
+
+                new_action = actions[ action_arg ]
 
                 ### get new state
                 old_state = state
@@ -71,16 +64,13 @@ class RLMaze:
 
                 new_state, reward = self.compute_reward(
                                             old_state,
-                                            new_state,
-                                            action_number,
-                                            maze_grid,
-                                            maze_finish)
+                                            new_state)
 
                 logging.debug(f'\nnew_action ({action_counter}): {new_action} state: {old_state} -> {new_state}')
 
-                q_table[ old_state[0]*maze_dim[0] + old_state[1] ][ action_number ] = \
-                    (1- self.cfg.alpha) * q_table[ old_state[0]*maze_dim[0] + old_state[1] ][ action_number ] \
-                    + self.cfg.alpha * (reward + self.cfg.gamma * np.max(q_table[ new_state[0]*maze_dim[0] + new_state[1] ]))
+                q_table[ old_state[0]*self.cfg.maze_dim[0] + old_state[1] ][ action_arg ] = \
+                    (1- self.cfg.alpha) * q_table[ old_state[0]*self.cfg.maze_dim[0] + old_state[1] ][ action_arg ] \
+                    + self.cfg.alpha * (reward + self.cfg.gamma * np.max(q_table[ new_state[0]*self.cfg.maze_dim[0] + new_state[1] ]))
 
                 ### if finished - print status
                 if self.maze_completed == True:
@@ -92,12 +82,10 @@ class RLMaze:
 
             ### keep track of required steps
             epoch_steps.append(action_counter)
-            epoch_explore_ratio.append(explore_counter / action_counter )
 
-        self.agent_location(new_state, maze_grid)
+        self.agent_location(state)
         logging.info(f'Q: {q_table}')
         logging.info(f'Epoch learning: \n {epoch_steps}')
-        logging.debug(f'Explore/exploit ratio:\n{epoch_explore_ratio}')
         Utils().plot_epochs(epoch_steps, self.cfg.maze_name)
 
         return
@@ -105,32 +93,28 @@ class RLMaze:
 
     def compute_reward(self,
                         old_state,
-                        new_state,
-                        action_number,
-                        maze_grid,
-                        maze_finish):
+                        new_state):
         """ evaluate performed action
         
         args:
         - state (tuple): state before action was performed
         - new_state (tuple): state after action, has to be checked first
-        - action_number (int): number of action to perform
         
         return:
         - state (tuple): return (new) state of agent
         """
 
         ### check for maze finish
-        if new_state[0] == maze_finish[0] and new_state[1] == maze_finish[1]:
+        if new_state[0] == self.cfg.maze_finish[0] and new_state[1] == self.cfg.maze_finish[1]:
             new_state = new_state
             reward = self.cfg.reward_finish
             logging.debug('Maze finish')
             self.maze_completed = True
 
         ### perform action
-        elif maze_grid[new_state[0]][new_state[1]] == 0:
+        elif self.cfg.maze_grid[new_state[0]][new_state[1]] == 0:
             ### punish inaction
-            if action_number == 0:
+            if new_state[0] == old_state[0] and new_state[1] == old_state[1]:
                 reward = self.cfg.reward_inactive
                 logging.debug('Inactive - new_state')
 
@@ -142,7 +126,7 @@ class RLMaze:
             new_state = new_state
 
         ### check for wall
-        elif maze_grid[new_state[0]][new_state[1]] == 1:
+        elif self.cfg.maze_grid[new_state[0]][new_state[1]] == 1:
             new_state = old_state
             reward = self.cfg.reward_wall
             logging.debug('Maze wall - use old_state')
@@ -156,40 +140,33 @@ class RLMaze:
     def perform_action(self,
                     state,
                     actions,
-                    q_table,
-                    maze_dim,
-                    explore_counter):
+                    q_table):
         """ perform action """
 
         ### explore/exploit
         if np.random.uniform(low=0, high=1) < self.cfg.epsilon:
             ### explore -> randomly choose action from discrete action space
-            action_number = np.random.randint(low=0, high=len(actions))
-            explore_counter += 1
+            action_arg = np.random.randint(low=0, high=len(actions))
 
         else:
             ### exploit -> choose highest scoring action
-            action_number = np.argmax(q_table[ state[0]*maze_dim[0] + state[1] ])
+            action_arg = np.argmax(q_table[ state[0]*self.cfg.maze_dim[0] + state[1] ])
 
-        new_action = actions[ action_number ]
-
-        return new_action, action_number, explore_counter
+        return action_arg
 
 
     def agent_location(self,
-                    state,
-                    maze_grid):
+                    state):
         """ agent location
         
         args:
         - state (tuple): current state of agent
-        - maze_grid (np.array): maze grid
         
         return:
 
         """
         ### agent location
-        agent_loc = np.copy( maze_grid[:] )
+        agent_loc = np.copy( self.cfg.maze_grid[:] )
         agent_loc[state[0]][state[1]] = 5
 
         logging.info(f'\n Agent location (5) in maze:\n{agent_loc}')
